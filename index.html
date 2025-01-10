@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebAR Media Viewer</title>
+    <!-- Use specific versions known to work together -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- Add AR.js Core -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar.js"></script>
+    <style>
+        .arjs-loader {
+            position: fixed;
+            z-index: 999;
+            overflow: show;
+            margin: auto;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            width: 50px;
+            height: 50px;
+            display: none;
+        }
+        
+        .arjs-loader.is-loading {
+            display: block;
+        }
+        
+        .arjs-loader div {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            margin: 8px;
+            border: 4px solid #fff;
+            border-radius: 50%;
+            border-color: #fff transparent transparent transparent;
+            animation: arjs-loader 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+
+        @keyframes arjs-loader {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <!-- Loading indicator -->
+    <div class="arjs-loader">
+        <div></div>
+    </div>
+
+    <!-- Error message container -->
+    <div id="error-message" style="position: fixed; top: 10px; left: 10px; color: red; z-index: 1000;"></div>
+
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        renderer="logarithmicDepthBuffer: true;"
+        vr-mode-ui="enabled: false"
+    >
+        <a-assets timeout="30000">
+            <video 
+                id="video-asset" 
+                src="pso.mp4"
+                preload="auto"
+                loop="true"
+                crossorigin="anonymous"
+                playsinline
+                webkit-playsinline
+                autoplay
+                muted
+            ></video>
+        
+
+        <!-- Video Marker -->
+        <a-marker 
+            preset="hiro"
+            smooth="true"
+            smoothCount="5"
+            smoothTolerance="0.01"
+            smoothThreshold="5"
+        >
+            <a-video
+                src="#video-asset"
+                position="0 0 0"
+                rotation="-90 0 0"
+                width="2"
+                height="1.5"
+                play="true"
+            ></a-video>
+        </a-marker>
+
+       
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        // Show loading indicator
+        document.querySelector('.arjs-loader').classList.add('is-loading');
+
+        // Error handling function
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+        }
+
+        window.addEventListener('load', () => {
+            // Get video element
+            const video = document.getElementById('video-asset');
+            
+            // Handle video loading error
+            video.addEventListener('error', (e) => {
+                showError('Error loading video: ' + (e.message || 'Unknown error'));
+            });
+
+            // Auto-play video when loaded
+            video.play().catch((error) => {
+                showError('Video autoplay failed: ' + error.message);
+            });
+
+            // Handle marker events
+            const videoMarker = document.querySelector('a-marker[preset="hiro"]');
+            videoMarker.addEventListener('markerFound', () => {
+                video.play().catch((error) => {
+                    showError('Video play on marker failed: ' + error.message);
+                });
+            });
+
+            // Hide loading indicator when scene is ready
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('loaded', () => {
+                document.querySelector('.arjs-loader').classList.remove('is-loading');
+            });
+
+            // Handle AR.js initialization errors
+            scene.addEventListener('arError', (error) => {
+                showError('AR.js Error: ' + error.detail);
+            });
+        });
+
+        // Check for WebGL support
+        if (!AFRAME.utils.device.checkHeadsetConnected()) {
+            if (!AFRAME.utils.device.isMobile()) {
+                showError('Please use a mobile device for the best AR experience');
+            }
+        }
+    </script>
+</body>
+</html>
