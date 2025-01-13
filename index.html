@@ -74,14 +74,20 @@
                 });
             });
 
-            // Handle tap interactivity
-            videoPlane.addEventListener('click', function() {
+            // Handle click and touch interactions
+            const toggleVideoPlayback = function() {
                 if (video.paused) {
                     video.play();
+                    console.log("Video playing");
                 } else {
                     video.pause();
+                    console.log("Video paused");
                 }
-            });
+            };
+
+            // Add event listeners for both click and touchstart
+            videoPlane.addEventListener('click', toggleVideoPlayback);
+            videoPlane.addEventListener('touchstart', toggleVideoPlayback);
 
             // Handle video errors
             video.addEventListener('error', function() {
@@ -93,14 +99,12 @@
 
             // Marker interactions
             marker.addEventListener('markerFound', function() {
-                // Ensure the first frame is visible when the marker is found
                 if (video.paused) {
                     video.currentTime = 0;
                 }
             });
 
             marker.addEventListener('markerLost', function() {
-                // Pause the video when the marker is lost
                 video.pause();
             });
         });
