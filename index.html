@@ -74,12 +74,12 @@
         <a-assets>
             <video 
                 id="localVideo" 
-                preload="auto"
+                preload="metadata"
                 loop="true"
                 crossorigin="anonymous"
                 webkit-playsinline
                 playsinline
-                poster="./Person.png">
+                muted>
                 <source src="./new.mp4" type="video/mp4">
             </video>
         </a-assets>
@@ -112,6 +112,18 @@
             const muteBtn = document.querySelector('#muteBtn');
             const volumeBar = document.querySelector('#volumeBar');
 
+            // Initialize first frame
+            video.addEventListener('loadedmetadata', function() {
+                // Set current time to 0 to show first frame
+                video.currentTime = 0;
+                // Play and immediately pause to ensure frame is shown
+                video.play().then(() => {
+                    video.pause();
+                }).catch(error => {
+                    console.log("Initial frame setup failed:", error);
+                });
+            });
+
             // Format time in MM:SS
             function formatTime(seconds) {
                 const minutes = Math.floor(seconds / 60);
@@ -133,6 +145,7 @@
             // Seek bar
             video.addEventListener('loadedmetadata', function() {
                 seekBar.max = video.duration;
+                timeDisplay.textContent = `0:00 / ${formatTime(video.duration)}`;
             });
 
             video.addEventListener('timeupdate', function() {
@@ -175,6 +188,10 @@
 
             marker.addEventListener('markerFound', function() {
                 controls.style.display = 'block';
+                // Ensure the first frame is visible
+                if (video.paused) {
+                    video.currentTime = 0;
+                }
             });
 
             marker.addEventListener('markerLost', function() {
