@@ -19,11 +19,27 @@
             z-index: 1000;
             display: none;
         }
+
+        .play-status {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
     <div id="errorMsg" class="error-message">
         Video format not supported. Please ensure WebM format with alpha channel.
+    </div>
+    <div id="playStatus" class="play-status">
+        Tap to Play
     </div>
 
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
@@ -41,98 +57,74 @@
         </a-assets>
         
         <a-marker preset="hiro">
-            <a-video
-                id="videoPlane"
-                src="#localVideo"
+            <a-entity
+                id="videoContainer"
                 position="0 0.1 0"
-                rotation="-90 0 0"
-                width="2"
-                height="1.5"
-                material="shader: chromakey; src: #localVideo; color: 1.0 0.0 0.0; transparent: true; alphaTest: 1; threshold: 0.2"
-                class="clickable"
-                gesture-handler>
-            </a-video>
+                rotation="-90 0 0">
+                <a-video
+                    id="videoPlane"
+                    src="#localVideo"
+                    width="2"
+                    height="1.5"
+                    material="shader: chromakey; src: #localVideo; color: 1.0 0.0 0.0; transparent: true; alphaTest: 1; threshold: 0.2"
+                    class="clickable"
+                    video-handler>
+                </a-video>
+            </a-entity>
         </a-marker>
-        <a-entity camera look-controls></a-entity>
+        
+        <a-entity camera position="0 0 0" look-controls="enabled: false" cursor="rayOrigin: mouse; fuse: false"
+            raycaster="objects: .clickable; far: 100">
+        </a-entity>
     </a-scene>
     
     <script>
-        AFRAME.registerComponent('gesture-handler', {
+        AFRAME.registerComponent('video-handler', {
             init: function() {
                 const video = document.querySelector('#localVideo');
+                const playStatus = document.querySelector('#playStatus');
                 let isPlaying = false;
-                let touchStartX = 0;
-                let touchStartTime = 0;
-                let initialVideoTime = 0;
-                let isSeeking = false;
 
                 // Initialize first frame
                 video.addEventListener('loadedmetadata', function() {
                     video.currentTime = 0;
-                    video.play().then(() => {
-                        video.pause();
-                    }).catch(error => {
-                        console.log("Initial frame setup failed:", error);
-                    });
                 });
 
-                // Touch start event
-                this.el.addEventListener('touchstart', (e) => {
-                    touchStartX = e.touches[0].clientX;
-                    touchStartTime = Date.now();
-                    initialVideoTime = video.currentTime;
-                    isSeeking = false;
-                });
-
-                // Touch move event for seeking
-                this.el.addEventListener('touchmove', (e) => {
-                    const touchCurrentX = e.touches[0].clientX;
-                    const deltaX = touchCurrentX - touchStartX;
-                    
-                    // If moved more than 10px horizontally, consider it a seek gesture
-                    if (Math.abs(deltaX) > 10) {
-                        isSeeking = true;
-                        const seekAmount = (deltaX / window.innerWidth) * video.duration;
-                        let newTime = initialVideoTime + seekAmount;
-                        
-                        // Clamp the new time between 0 and video duration
-                        newTime = Math.max(0, Math.min(newTime, video.duration));
-                        video.currentTime = newTime;
-                    }
-                });
-
-                // Touch end event
-                this.el.addEventListener('touchend', (e) => {
-                    const touchDuration = Date.now() - touchStartTime;
-                    
-                    // If it was a quick tap (less than 200ms) and not a seek gesture
-                    if (touchDuration < 200 && !isSeeking) {
-                        if (isPlaying) {
-                            video.pause();
-                            isPlaying = false;
-                        } else {
-                            video.play().then(() => {
-                                isPlaying = true;
-                            }).catch(error => {
-                                console.log("Video play failed:", error);
-                            });
-                        }
-                    }
-                });
-
-                // Mouse events for desktop testing
-                this.el.addEventListener('click', (e) => {
-                    if (isPlaying) {
-                        video.pause();
-                        isPlaying = false;
-                    } else {
+                // Function to toggle play/pause
+                const togglePlay = () => {
+                    if (video.paused) {
                         video.play().then(() => {
                             isPlaying = true;
+                            playStatus.textContent = "Playing";
+                            setTimeout(() => {
+                                playStatus.style.display = 'none';
+                            }, 1000);
                         }).catch(error => {
                             console.log("Video play failed:", error);
+                            playStatus.textContent = "Tap screen first";
                         });
+                    } else {
+                        video.pause();
+                        isPlaying = false;
+                        playStatus.textContent = "Paused";
+                        playStatus.style.display = 'block';
                     }
+                };
+
+                // Handle click/touch events
+                this.el.addEventListener('click', togglePlay);
+                this.el.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                    togglePlay();
                 });
+
+                // Add screen touch handler for mobile devices
+                document.addEventListener('touchstart', function() {
+                    if (video.paused) {
+                        playStatus.style.display = 'block';
+                        playStatus.textContent = "Tap video to play";
+                    }
+                }, { once: true });
             }
         });
 
@@ -140,6 +132,7 @@
             const marker = document.querySelector('a-marker');
             const video = document.querySelector('#localVideo');
             const errorMsg = document.querySelector('#errorMsg');
+            const playStatus = document.querySelector('#playStatus');
 
             video.addEventListener('error', function(e) {
                 console.error('Video error:', e);
@@ -150,13 +143,16 @@
             });
 
             marker.addEventListener('markerFound', function() {
+                playStatus.style.display = 'block';
                 if (video.paused) {
                     video.currentTime = 0;
+                    playStatus.textContent = "Tap to Play";
                 }
             });
 
             marker.addEventListener('markerLost', function() {
                 video.pause();
+                playStatus.style.display = 'none';
             });
         });
     </script>
