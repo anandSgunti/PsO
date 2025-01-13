@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Interactive AR Transparent Video Display</title>
+    <title>Interactive AR Video Display with Controls</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.2.0/aframe.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ar.js/2.2.2/aframe-ar.min.js"></script>
@@ -20,17 +20,41 @@
             display: none;
         }
         
-        .play-instructions {
+        .video-controls {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
+            padding: 10px;
+            border-radius: 10px;
             z-index: 1000;
-            font-family: Arial, sans-serif;
+            display: none;
+        }
+
+        .video-controls button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .video-controls button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .video-controls input[type="range"] {
+            width: 100px;
+            margin: 0 10px;
+            vertical-align: middle;
+        }
+
+        .time-display {
+            margin: 0 10px;
         }
     </style>
 </head>
@@ -38,9 +62,14 @@
     <div id="errorMsg" class="error-message">
         Video format not supported. Please ensure WebM format with alpha channel.
     </div>
-    <div class="play-instructions">
-        Tap on the video to play/pause
+    <div id="videoControls" class="video-controls">
+        <button id="playPauseBtn">Play</button>
+        <input type="range" id="seekBar" value="0">
+        <span id="timeDisplay" class="time-display">0:00 / 0:00</span>
+        <button id="muteBtn">🔊</button>
+        <input type="range" id="volumeBar" min="0" max="1" step="0.1" value="1">
     </div>
+
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
         <a-assets>
             <video 
@@ -49,7 +78,8 @@
                 loop="true"
                 crossorigin="anonymous"
                 webkit-playsinline
-                playsinline>
+                playsinline
+                poster="./Person.png">
                 <source src="./new.mp4" type="video/mp4">
             </video>
         </a-assets>
@@ -70,40 +100,71 @@
     </a-scene>
     
     <script>
-        AFRAME.registerComponent('video-controls', {
-            init: function() {
-                const video = document.querySelector('#localVideo');
-                let isPlaying = false;
-                
-                // Add click listener to the video plane
-                this.el.addEventListener('click', function() {
-                    if (isPlaying) {
-                        video.pause();
-                        isPlaying = false;
-                    } else {
-                        video.play().catch(function(error) {
-                            console.log("Video play failed:", error);
-                        });
-                        isPlaying = true;
-                    }
-                });
-            }
-        });
-
         window.addEventListener('load', function() {
             const marker = document.querySelector('a-marker');
             const video = document.querySelector('#localVideo');
             const videoPlane = document.querySelector('#videoPlane');
             const errorMsg = document.querySelector('#errorMsg');
-            
-            // Add the video-controls component to the video plane
-            videoPlane.setAttribute('video-controls', '');
-            
-            // Add raycaster and cursor components to the camera for interaction
-            const camera = document.querySelector('[camera]');
-            camera.setAttribute('raycaster', 'objects: .clickable');
-            camera.setAttribute('cursor', 'rayOrigin: mouse');
-            
+            const controls = document.querySelector('#videoControls');
+            const playPauseBtn = document.querySelector('#playPauseBtn');
+            const seekBar = document.querySelector('#seekBar');
+            const timeDisplay = document.querySelector('#timeDisplay');
+            const muteBtn = document.querySelector('#muteBtn');
+            const volumeBar = document.querySelector('#volumeBar');
+
+            // Format time in MM:SS
+            function formatTime(seconds) {
+                const minutes = Math.floor(seconds / 60);
+                seconds = Math.floor(seconds % 60);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // Play/Pause button
+            playPauseBtn.addEventListener('click', function() {
+                if (video.paused) {
+                    video.play();
+                    playPauseBtn.textContent = 'Pause';
+                } else {
+                    video.pause();
+                    playPauseBtn.textContent = 'Play';
+                }
+            });
+
+            // Seek bar
+            video.addEventListener('loadedmetadata', function() {
+                seekBar.max = video.duration;
+            });
+
+            video.addEventListener('timeupdate', function() {
+                seekBar.value = video.currentTime;
+                timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            });
+
+            seekBar.addEventListener('change', function() {
+                video.currentTime = seekBar.value;
+            });
+
+            // Mute button
+            muteBtn.addEventListener('click', function() {
+                if (video.muted) {
+                    video.muted = false;
+                    muteBtn.textContent = '🔊';
+                } else {
+                    video.muted = true;
+                    muteBtn.textContent = '🔇';
+                }
+            });
+
+            // Volume bar
+            volumeBar.addEventListener('input', function() {
+                video.volume = volumeBar.value;
+                if (volumeBar.value === 0) {
+                    muteBtn.textContent = '🔇';
+                } else {
+                    muteBtn.textContent = '🔊';
+                }
+            });
+
             video.addEventListener('error', function(e) {
                 console.error('Video error:', e);
                 errorMsg.style.display = 'block';
@@ -113,12 +174,13 @@
             });
 
             marker.addEventListener('markerFound', function() {
-                // Don't autoplay when marker is found, wait for user interaction
-                console.log('Marker found');
+                controls.style.display = 'block';
             });
 
             marker.addEventListener('markerLost', function() {
+                controls.style.display = 'none';
                 video.pause();
+                playPauseBtn.textContent = 'Play';
             });
         });
     </script>
