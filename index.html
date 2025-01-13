@@ -57,31 +57,59 @@
         </a-assets>
         
         <a-marker preset="hiro">
-            <a-entity
-                id="videoContainer"
-                position="0 0.1 0"
-                rotation="-90 0 0">
+            <!-- Video Container -->
+            <a-entity position="0 0.1 0" rotation="-90 0 0">
+                <!-- Background Video -->
                 <a-video
                     id="videoPlane"
                     src="#localVideo"
                     width="2"
                     height="1.5"
-                    material="shader: chromakey; src: #localVideo; color: 1.0 0.0 0.0; transparent: true; alphaTest: 1; threshold: 0.2"
-                    class="clickable"
-                    video-handler>
+                    material="shader: chromakey; src: #localVideo; color: 1.0 0.0 0.0; transparent: true; alphaTest: 1; threshold: 0.2">
                 </a-video>
+
+                <!-- Invisible interaction plane -->
+                <a-plane
+                    class="clickable"
+                    width="2"
+                    height="1.5"
+                    position="0 0 0.01"
+                    material="opacity: 0"
+                    video-controls>
+                </a-plane>
+
+                <!-- Center Play Button (visible when paused) -->
+                <a-circle
+                    id="playButton"
+                    position="0 0 0.02"
+                    radius="0.2"
+                    material="color: #ffffff; opacity: 0.8"
+                    class="clickable"
+                    video-controls>
+                    <a-triangle
+                        position="0.05 0 0.001"
+                        rotation="0 0 -90"
+                        scale="0.2 0.2 0.2"
+                        material="color: #000000">
+                    </a-triangle>
+                </a-circle>
             </a-entity>
         </a-marker>
         
-        <a-entity camera position="0 0 0" look-controls="enabled: false" cursor="rayOrigin: mouse; fuse: false"
-            raycaster="objects: .clickable; far: 100">
+        <a-entity camera look-controls="enabled: false">
+            <a-cursor
+                raycaster="objects: .clickable"
+                cursor="fuse: false"
+                material="opacity: 0">
+            </a-cursor>
         </a-entity>
     </a-scene>
     
     <script>
-        AFRAME.registerComponent('video-handler', {
+        AFRAME.registerComponent('video-controls', {
             init: function() {
                 const video = document.querySelector('#localVideo');
+                const playButton = document.querySelector('#playButton');
                 const playStatus = document.querySelector('#playStatus');
                 let isPlaying = false;
 
@@ -90,11 +118,14 @@
                     video.currentTime = 0;
                 });
 
-                // Function to toggle play/pause
-                const togglePlay = () => {
+                const togglePlay = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
                     if (video.paused) {
                         video.play().then(() => {
                             isPlaying = true;
+                            playButton.setAttribute('visible', false);
                             playStatus.textContent = "Playing";
                             setTimeout(() => {
                                 playStatus.style.display = 'none';
@@ -102,35 +133,44 @@
                         }).catch(error => {
                             console.log("Video play failed:", error);
                             playStatus.textContent = "Tap screen first";
+                            playStatus.style.display = 'block';
                         });
                     } else {
                         video.pause();
                         isPlaying = false;
+                        playButton.setAttribute('visible', true);
                         playStatus.textContent = "Paused";
                         playStatus.style.display = 'block';
                     }
                 };
 
-                // Handle click/touch events
+                // Mouse events
                 this.el.addEventListener('click', togglePlay);
-                this.el.addEventListener('touchend', function(e) {
+                
+                // Touch events
+                this.el.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    togglePlay();
                 });
+                
+                this.el.addEventListener('touchend', togglePlay);
 
-                // Add screen touch handler for mobile devices
-                document.addEventListener('touchstart', function() {
-                    if (video.paused) {
-                        playStatus.style.display = 'block';
-                        playStatus.textContent = "Tap video to play";
+                // Double-tap prevention
+                let lastTap = 0;
+                document.addEventListener('touchend', function(e) {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 500 && tapLength > 0) {
+                        e.preventDefault();
                     }
-                }, { once: true });
+                    lastTap = currentTime;
+                });
             }
         });
 
         window.addEventListener('load', function() {
             const marker = document.querySelector('a-marker');
             const video = document.querySelector('#localVideo');
+            const playButton = document.querySelector('#playButton');
             const errorMsg = document.querySelector('#errorMsg');
             const playStatus = document.querySelector('#playStatus');
 
@@ -146,6 +186,7 @@
                 playStatus.style.display = 'block';
                 if (video.paused) {
                     video.currentTime = 0;
+                    playButton.setAttribute('visible', true);
                     playStatus.textContent = "Tap to Play";
                 }
             });
@@ -153,7 +194,16 @@
             marker.addEventListener('markerLost', function() {
                 video.pause();
                 playStatus.style.display = 'none';
+                playButton.setAttribute('visible', false);
             });
+
+            // Enable video on first user interaction
+            document.addEventListener('touchstart', function() {
+                video.play().then(() => {
+                    video.pause();
+                    playButton.setAttribute('visible', true);
+                }).catch(e => console.log(e));
+            }, { once: true });
         });
     </script>
 </body>
